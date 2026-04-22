@@ -46,6 +46,8 @@ dev = [
     "pytest-cov>=5",
     "ruff>=0.5",
     "mypy>=1.10",
+    # Needed by scripts/make_<chunk>_figures.py — dev-time only, not used at runtime.
+    "matplotlib>=3.8",
 ]
 
 [project.urls]
@@ -78,6 +80,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004", "S101"]
+# Figure-generation scripts are inherently long sequences of plt calls.
+# PLR0915 (too many statements) fires unhelpfully on otherwise-clear code.
+"scripts/make_*_figures.py" = ["PLR0915"]
 
 [tool.mypy]
 python_version = "3.11"
