@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 - Product yields per reaction do **not** uniformly sum to 1.0: on-grid reactions sum to `on_grid_branch + N_frag × fragmentation_branch`. Fragmentation reactions with multiple fragment products (e.g. S2.1, sum ≈ 2.0) are consistent with one parent generating multiple smaller fragments. Fortran-encoded zero-yield pathways (e.g. S3.1, S4.1) are preserved verbatim; they represent mass loss out of the tracked grid.
+- **S1.figures-retrofit — visual diagnostics for S1.1 and S1.4**: `scripts/make_s1.1_figures.py` and `scripts/make_s1.4_figures.py` generate 6 committed PNGs under `docs/figures/`: (C, O) grid coverage, per-reaction yield-sum bar chart (regime-coloured), log-histogram of rate constants, full (39 × 41) signed stoichiometry heatmap, per-species reactant degree, per-species product degree. Matplotlib added to `[project.optional-dependencies].dev`.
 
 ## [0.1.0] — planned
 

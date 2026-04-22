@@ -48,6 +48,28 @@ Requires Python ≥ 3.11.
 
 Tracked in the master plan as chunks `S1.0` … `S1.21`.
 
+### Figures
+
+Each scientific chunk ships matplotlib figures under `docs/figures/<chunk-id>/`, regenerable via `scripts/make_<chunk>_figures.py`.
+
+**S1.1 — parsed mechanism**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.1/cover_grid.png`](docs/figures/s1.1/cover_grid.png) | Which (carbon, oxygen) cells of the 7×7 grid actually contain species. Precursor GENVOC at (C=7, O=0) flagged in red. |
+| [`docs/figures/s1.1/yield_sum_per_reaction.png`](docs/figures/s1.1/yield_sum_per_reaction.png) | Σ(branch × oxy_yield) per reaction, coloured by regime — on-grid (~1), fragmentation (>1), or zero-yield mass-loss pathway. |
+| [`docs/figures/s1.1/rate_constants.png`](docs/figures/s1.1/rate_constants.png) | Log-histogram of `k_OH` at 300 K across all 39 reactions, with BL20 (GENVOC+OH) annotated. |
+
+**S1.4 — SOMNetwork**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.4/stoich_heatmap.png`](docs/figures/s1.4/stoich_heatmap.png) | Full (39 × 41) signed stoichiometry matrix. Blue = reactant (−1), red = product yield. |
+| [`docs/figures/s1.4/reactant_degree.png`](docs/figures/s1.4/reactant_degree.png) | How many reactions each species drives as a reactant. Verifies that every grid species is consumed by exactly one reaction. |
+| [`docs/figures/s1.4/product_degree.png`](docs/figures/s1.4/product_degree.png) | How many reactions each species appears in as a product. High-connectivity species (GENSOMG_01_*, 02_*, 03_*) reflect fragmentation routing. |
+
+To regenerate: `python scripts/make_s1.1_figures.py` and `python scripts/make_s1.4_figures.py` (requires `pip install -e ".[dev]"`).
+
 ### Regenerating the mechanism JSON
 
 `data/mechanisms/gensomg.json` is committed; normal development does not need to touch it. If the Fortran mechanism files change, regenerate with:
