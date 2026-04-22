@@ -41,7 +41,7 @@ Requires Python ≥ 3.11.
 | `som_jax.mechanism.json_io` | Deterministic JSON serialisation for committed mechanism | alpha (S1.1) |
 | `data/mechanisms/gensomg.json` | Committed GENSOMG network (41 species, 39 reactions) | alpha (S1.1) |
 | `som_jax.mechanism.network` | `SOMNetwork` PyTree (dense stoichiometry, rate constants as `jax.numpy`) | alpha (S1.4) |
-| `som_jax.rhs` | ODE right-hand side: `stoich.T @ (k · OH · y[reactant_idx])` | not started (S1.6) |
+| `som_jax.rhs` | ODE right-hand side: `stoich.T @ (k · OH · y[reactant_idx])` | alpha (S1.6) |
 | `som_jax.simulate` | Public `simulate(cfg, t_span, save_at)` using `diffrax.Kvaerno5` | not started (S1.7) |
 | regression suite | Vs Fortran goldens at ≤0.1% relative per species | not started (S1.10–S1.11) |
 | differentiability suite | `dLVP` recovery demo via `optax.adam` | not started (S1.17) |
