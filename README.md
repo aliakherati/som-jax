@@ -68,7 +68,15 @@ Each scientific chunk ships matplotlib figures under `docs/figures/<chunk-id>/`,
 | [`docs/figures/s1.4/reactant_degree.png`](docs/figures/s1.4/reactant_degree.png) | How many reactions each species drives as a reactant. Verifies that every grid species is consumed by exactly one reaction. |
 | [`docs/figures/s1.4/product_degree.png`](docs/figures/s1.4/product_degree.png) | How many reactions each species appears in as a product. High-connectivity species (GENSOMG_01_*, 02_*, 03_*) reflect fragmentation routing. |
 
-To regenerate: `python scripts/make_s1.1_figures.py` and `python scripts/make_s1.4_figures.py` (requires `pip install -e ".[dev]"`).
+**S1.6 — RHS behaviour**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.6/genvoc_only_dydt.png`](docs/figures/s1.6/genvoc_only_dydt.png) | `dy/dt` at `t=0` when only GENVOC is nonzero. Exactly five species light up (BL20's reactant and its four first-gen products), confirming the activation pattern. |
+| [`docs/figures/s1.6/uniform_state_dydt.png`](docs/figures/s1.6/uniform_state_dydt.png) | `dy/dt` at a uniform concentration. Shows which species are net produced vs net consumed when the whole grid is equally populated — a sanity check on coupling directions. |
+| [`docs/figures/s1.6/jacobian_structure.png`](docs/figures/s1.6/jacobian_structure.png) | `df/dy` Jacobian at a uniform state. Diagonal is self-consumption; off-diagonal reds expose the reaction-graph's adjacency structure. |
+
+To regenerate: `python scripts/make_s1.1_figures.py`, `make_s1.4_figures.py`, and `make_s1.6_figures.py` (requires `pip install -e ".[dev]"`).
 
 ### Regenerating the mechanism JSON
 
