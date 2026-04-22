@@ -36,14 +36,32 @@ Requires Python ≥ 3.11.
 
 | Module | Purpose | Status |
 |---|---|---|
-| `som_jax.mechanism.parser` | Parse Fortran `.som`/`.mod`/`.doc` → JSON intermediate | not started |
-| `som_jax.mechanism.network` | `SOMNetwork` PyTree (species, stoichiometry, rate constants) | not started |
-| `som_jax.rhs` | ODE right-hand side: `stoich.T @ (k · OH · y[reactant_idx])` | not started |
-| `som_jax.simulate` | Public `simulate(cfg, t_span, save_at)` using `diffrax.Kvaerno5` | not started |
-| regression suite | Vs Fortran goldens at ≤0.1% relative per species | not started |
-| differentiability suite | `dLVP` recovery demo via `optax.adam` | not started |
+| `som_jax.mechanism.parser` | Parse Fortran `.som`/`.mod`/`.doc` → typed `Mechanism` | alpha (S1.1) |
+| `som_jax.mechanism.types` | `Mechanism`, `Species`, `Reaction`, `Product` dataclasses | alpha (S1.1) |
+| `som_jax.mechanism.json_io` | Deterministic JSON serialisation for committed mechanism | alpha (S1.1) |
+| `data/mechanisms/gensomg.json` | Committed GENSOMG network (41 species, 39 reactions) | alpha (S1.1) |
+| `som_jax.mechanism.network` | `SOMNetwork` PyTree (dense stoichiometry, rate constants as `jax.numpy`) | not started (S1.4) |
+| `som_jax.rhs` | ODE right-hand side: `stoich.T @ (k · OH · y[reactant_idx])` | not started (S1.6) |
+| `som_jax.simulate` | Public `simulate(cfg, t_span, save_at)` using `diffrax.Kvaerno5` | not started (S1.7) |
+| regression suite | Vs Fortran goldens at ≤0.1% relative per species | not started (S1.10–S1.11) |
+| differentiability suite | `dLVP` recovery demo via `optax.adam` | not started (S1.17) |
 
 Tracked in the master plan as chunks `S1.0` … `S1.21`.
+
+### Regenerating the mechanism JSON
+
+`data/mechanisms/gensomg.json` is committed; normal development does not need to touch it. If the Fortran mechanism files change, regenerate with:
+
+```bash
+python scripts/generate_mechanism_json.py \
+    --mod ../som-tomas-app/src/saprc14_rev1.mod \
+    --doc ../som-tomas-app/src/saprc14_rev1.doc \
+    --som ../som-tomas-app/src/saprc14_rev1.som \
+    --family GENSOMG \
+    --output data/mechanisms/gensomg.json
+```
+
+The resulting JSON embeds SHA-256 digests of the source files so regressions can pinpoint mechanism drift.
 
 ## Related packages
 
@@ -53,11 +71,16 @@ Tracked in the master plan as chunks `S1.0` … `S1.21`.
 
 ## Scientific references
 
-**To be populated.** Intended citations (awaiting confirmation):
+BibTeX in [`docs/references.bib`](docs/references.bib); grows as modules land.
 
-- Cappa & Wilson (2012) — Statistical Oxidation Model formulation.
-- Cappa et al. (2013) / Jathar et al. (2014) — multigenerational SOM extension.
-- Epstein et al. (2010) — `Hvap = -11·log10(c*) + 131`.
+Current (S1.1):
+
+- Cappa, C. D. and Wilson, K. R. (2012). Multi-generation gas-phase oxidation, equilibrium partitioning, and the formation and evolution of secondary organic aerosol. *Atmos. Chem. Phys.*, 12, 8399–8411. [doi:10.5194/acp-12-8399-2012](https://doi.org/10.5194/acp-12-8399-2012).
+- Cappa, C. D. et al. (2013). Application of the Statistical Oxidation Model (SOM) to Secondary Organic Aerosol formation from photooxidation of C12 alkanes. *Atmos. Chem. Phys.*, 13, 1591–1606. [doi:10.5194/acp-13-1591-2013](https://doi.org/10.5194/acp-13-1591-2013).
+
+Planned (later chunks):
+- Epstein, Riipinen, Donahue (2010) — `Hvap = -11·log10(c*) + 131` (volatility module).
+- Pankow & Asher (2008) — SIMPOL.1 (volatility module).
 
 ## License
 
