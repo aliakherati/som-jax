@@ -11,6 +11,7 @@ from a parsed :class:`Mechanism`.
 """
 
 from som_jax.mechanism.json_io import mechanism_from_json, mechanism_to_json
+from som_jax.mechanism.network import SOMNetwork
 from som_jax.mechanism.parser import parse_mechanism
 from som_jax.mechanism.types import (
     Mechanism,
@@ -26,6 +27,7 @@ __all__ = [
     "MechanismMetadata",
     "Product",
     "Reaction",
+    "SOMNetwork",
     "SourceFileRef",
     "Species",
     "mechanism_from_json",
