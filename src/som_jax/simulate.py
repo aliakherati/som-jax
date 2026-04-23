@@ -28,7 +28,7 @@ References
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,6 +38,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from som_jax.mechanism.network import SOMNetwork
+from som_jax.oh import OHCallable, OHInput, as_oh_callable
 from som_jax.rhs import som_rhs
 
 
@@ -111,25 +112,28 @@ def build_initial(network: SOMNetwork, values: Mapping[str, float]) -> Array:
     return y
 
 
-def _vector_field(t: Any, y: Array, args: Any) -> Array:
-    """diffrax vector field adapter: f(t, y, args) -> dy/dt.
+def _make_vector_field(oh_callable: OHCallable) -> Callable[[Any, Array, Any], Array]:
+    """Build a diffrax vector field closed over ``oh_callable``.
 
-    Signature uses ``Any`` on ``t`` and ``args`` to match diffrax's
-    generic ``Callable`` contract (diffrax accepts scalars of several
-    types in ``t`` and arbitrary PyTrees in ``args``).
-
-    ``t`` is ignored here (constant-OH case in v1); S1.9 will lift OH to
-    a time-varying callable and use ``t`` to evaluate it.
+    A closure is cleaner than threading the callable through ``args`` —
+    functions are not first-class PyTrees, and stuffing one into ``args``
+    forces awkward static-argnum gymnastics. Capturing it here makes the
+    callable part of the compiled function's identity, which matches
+    diffrax's own expectations.
     """
-    del t
-    network, oh = args
-    return som_rhs(y, oh, network)
+
+    def vf(t: Any, y: Array, args: Any) -> Array:
+        (network,) = args
+        oh_t = oh_callable(jnp.asarray(t))
+        return som_rhs(y, oh_t, network)
+
+    return vf
 
 
 def simulate(
     network: SOMNetwork,
     initial: Array,
-    oh: Array | float,
+    oh: OHInput,
     t_span: tuple[float, float],
     save_at: Array | Iterable[float],
     *,
@@ -150,8 +154,10 @@ def simulate(
         matches ``network.species_names``. Use :func:`build_initial` to
         construct from a ``{name: value}`` mapping.
     oh
-        Scalar OH concentration held constant over the integration. Same
-        unit system as ``initial``.
+        OH concentration. May be a scalar (constant over the integration)
+        or a callable ``t -> OH(t)``. See :mod:`som_jax.oh` for helpers
+        (``oh_constant``, ``oh_linear_ramp``, ``oh_piecewise_linear``,
+        ``oh_exponential_decay``).  Same unit system as ``initial``.
     t_span
         ``(t0, t1)`` integration bounds.
     save_at
@@ -188,7 +194,8 @@ def simulate(
     solver = solver if solver is not None else diffrax.Kvaerno5()
     adjoint = adjoint if adjoint is not None else diffrax.RecursiveCheckpointAdjoint()
 
-    term = diffrax.ODETerm(_vector_field)
+    oh_callable = as_oh_callable(oh)
+    term = diffrax.ODETerm(_make_vector_field(oh_callable))
     controller = diffrax.PIDController(rtol=rtol, atol=atol)
     saveat = diffrax.SaveAt(ts=jnp.asarray(save_at))
 
@@ -199,7 +206,7 @@ def simulate(
         t1=float(t_span[1]),
         dt0=None,
         y0=initial,
-        args=(network, jnp.asarray(oh)),
+        args=(network,),
         saveat=saveat,
         stepsize_controller=controller,
         adjoint=adjoint,
