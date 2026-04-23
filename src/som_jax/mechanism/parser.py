@@ -27,9 +27,9 @@ from __future__ import annotations
 import datetime as _dt
 import hashlib
 import re
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from som_jax import __version__ as _package_version
 from som_jax.mechanism.types import (
     Mechanism,
     MechanismMetadata,
@@ -38,6 +38,20 @@ from som_jax.mechanism.types import (
     SourceFileRef,
     Species,
 )
+
+
+def _current_package_version() -> str:
+    """Read the installed som-jax version without importing som_jax itself.
+
+    Importing from ``som_jax`` at parser-module import time would create a
+    circular dependency with ``som_jax.__init__`` (which re-exports
+    ``simulate`` and friends, and those transitively import the parser).
+    """
+    try:
+        return version("som-jax")
+    except PackageNotFoundError:  # pragma: no cover - only in uninstalled dev
+        return "0.0.0+unknown"
+
 
 # --- regexes --------------------------------------------------------------
 
@@ -384,7 +398,7 @@ def parse_mechanism(
         source_refs.append(SourceFileRef(path=som_path.name, sha256=_sha256_of_file(som_path)))
 
     metadata = MechanismMetadata(
-        parser_version=_package_version,
+        parser_version=_current_package_version(),
         parsed_at_utc=_dt.datetime.now(_dt.UTC).isoformat(timespec="seconds"),
         source_files=tuple(source_refs),
     )
