@@ -11,7 +11,7 @@ Fixture
 ``tests/fixtures/sample_run/`` is a copy of
 ``atmos-jax-common/tests/fixtures/sample_run/`` (same files, ~80 KB).
 The committed Fortran outputs come from a short ``box.exe`` run with the
-``runme.py`` defaults trimmed to ``endtime = 0.10 h``:
+``runme.py`` defaults trimmed to ``endtime = 0.166 h``:
 
 - GENVOC initial concentration: 0.05 ppm
 - OH (constant): 1.5e6 molec cm⁻³
@@ -135,11 +135,12 @@ def jax_som_block(network: SOMNetwork, golden: GoldenRun) -> np.ndarray:
 
 
 # Magnitude floor for the per-species comparison. Below this, the
-# Fortran integrator's atol = 1e-30 (per box.f:828's INTEGR2 args) and
-# its real*4 write-side rounding dominate the apparent signal, so a
-# relative-error comparison is meaningless. The threshold is chosen so
-# that the well-resolved "fast cascade" species pass but the
-# tail species at ~1e-12 ppm are excluded.
+# Fortran integrator's atol = 1d-30 (per box.f:828's INTEGR2 args) and
+# REAL*4 truncation noise inside the auto-generated DIFUN mechanism
+# callback dominate the apparent signal, so a relative-error
+# comparison is meaningless. The threshold is chosen so that the
+# well-resolved "fast cascade" species pass but the tail species at
+# ~1e-12 ppm are excluded.
 _MAGNITUDE_FLOOR_PPM = 1e-10
 
 
@@ -150,14 +151,15 @@ def test_jax_matches_fortran_well_resolved_species(
 ) -> None:
     """Per-species comparison restricted to species above the magnitude floor.
 
-    Tolerance: 15% relative L2 / final-rel. The systematic JAX-vs-Fortran
-    gap on this run is ~7-10% across well-resolved species, attributable
-    to Fortran ``INTEGR2``'s rtol=2e-3 (per ``box.f:828``) — coarser
-    than JAX's rtol=1e-10. JAX produces consistently slightly higher
-    values for cascade products, which we read as Fortran losing some
-    mass to its own integrator error rather than JAX over-producing
-    (the GENVOC analytic-decay test exactly matches both, so the
-    chemistry is right at the source).
+    Tolerance: 3% relative L2 / final-rel. The Fortran reference now runs
+    ``INTEGR2`` with ``rtol = 1e-10`` in REAL*8 (per
+    ``som-tomas-fortran#2``), bringing JAX-vs-Fortran agreement to ~0.3%
+    median across 35+ species and ~2.6% max on the deepest cascade
+    species. The residual ~2.6% gap is dominated by REAL*4 truncation
+    in the auto-generated SAPRC mechanism callback (``DIFUN`` in
+    ``saprc14_rev1.f``), which we keep at single precision since
+    ``rhs.f`` bridges through scratch buffers — that's the largest
+    remaining noise source until the mechanism file itself is promoted.
 
     Correlation is uninformative with only two save points, so we set
     ``correlation_min=0`` and rely on L2 + final-rel.
@@ -178,7 +180,7 @@ def test_jax_matches_fortran_well_resolved_species(
         f"Magnitude floor {_MAGNITUDE_FLOOR_PPM} excluded too many species; "
         f"only {len(kept_names)} kept. Adjust the floor or revisit the run setup."
     )
-    if not report.passes(l2_tol=0.15, correlation_min=0.0, final_rel_tol=0.15):
+    if not report.passes(l2_tol=0.03, correlation_min=0.0, final_rel_tol=0.03):
         pytest.fail(report.summary())
 
 
@@ -190,11 +192,9 @@ def test_bl20_first_gen_products_match_yields(
 ) -> None:
     """The four first-generation BL20 products are the cleanest possible
     cross-check: their concentrations are dominated by direct production
-    from GENVOC + OH, with very limited secondary loss in 10 min.
-
-    Tighter tolerance than the broad test (10% rather than 15%): these
-    species sit at 1e-7 to 1e-4 ppm — well above the integrator atol
-    floor.
+    from GENVOC + OH, with very limited secondary loss in 10 min. With
+    the REAL*8 Fortran they agree with JAX to 4-5 significant figures —
+    well below the ~3% bound for the broad cascade test.
     """
     targets = ("GENSOMG_07_01", "GENSOMG_07_02", "GENSOMG_07_03", "GENSOMG_07_04")
     target_idx = [golden.spec.som_species.index(n) for n in targets]
@@ -203,7 +203,7 @@ def test_bl20_first_gen_products_match_yields(
         fortran_som_block[:, target_idx],
         targets,
     )
-    if not report.passes(l2_tol=0.10, correlation_min=0.0, final_rel_tol=0.10):
+    if not report.passes(l2_tol=0.005, correlation_min=0.0, final_rel_tol=0.005):
         pytest.fail(report.summary())
 
 
@@ -223,9 +223,10 @@ def test_low_magnitude_species_remain_low_in_jax(
         pytest.skip("No species below the magnitude floor in this run.")
 
     jax_max_for_dropped = np.abs(jax_som_block[:, drop_idx]).max(axis=0)
-    # Allow JAX up to 10x the floor — it can be slightly higher than
-    # Fortran for tail species (the systematic JAX>Fortran gap holds),
-    # but not orders of magnitude higher.
+    # Allow JAX up to 10x the floor — both sides should be essentially
+    # noise here, so a couple of ULPs above the floor are fine, but we
+    # don't want orders-of-magnitude excess (that would suggest a
+    # cascade-chemistry bug).
     over_threshold = jax_max_for_dropped > 10 * _MAGNITUDE_FLOOR_PPM
     if np.any(over_threshold):
         offenders = [
@@ -253,6 +254,8 @@ def test_genvoc_decay_matches_fortran_at_final_time(
     - the JAX result matches that analytic
     - the Fortran golden matches the same analytic
     - therefore JAX matches Fortran at the GENVOC trajectory level
+
+    With REAL*8 Fortran the two agree to ~9 significant figures.
     """
     oh_ppm = float(molec_cm3_to_ppm(_OH_MOLEC_PER_CM3, _TEMP_K, _PRES_PA))
     save_at_min = jnp.asarray(np.asarray(golden.gc.time_hours) * 60.0)
@@ -274,14 +277,15 @@ def test_genvoc_decay_matches_fortran_at_final_time(
     genvoc_idx = golden.spec.active_gas_species.index("GENVOC")
     fortran_genvoc = np.asarray(golden.saprcgc_ppm[:, genvoc_idx])
 
-    # Initial value should match ~exactly.
+    # Initial value: REAL*8 fixture stores 0.05 exactly (was REAL*4 before
+    # the fortran promotion, which lost ULPs in the write).
     assert jax_genvoc[0] == pytest.approx(_INITIAL_GENVOC_PPM, rel=1e-12)
-    assert fortran_genvoc[0] == pytest.approx(_INITIAL_GENVOC_PPM, rel=1e-3)
+    assert fortran_genvoc[0] == pytest.approx(_INITIAL_GENVOC_PPM, rel=1e-12)
 
-    # Final value: agree to within 1% (the Fortran solver, real*4 write,
-    # and gentle decay over 10 min combine to limit precision).
+    # Final value: JAX and Fortran now agree to ~9 sig figs after the
+    # Fortran rtol promotion.
     rel_err = abs(jax_genvoc[-1] - fortran_genvoc[-1]) / fortran_genvoc[-1]
-    assert rel_err < 0.05, (
-        f"JAX GENVOC at t_final = {jax_genvoc[-1]:.6e} ppm; "
-        f"Fortran = {fortran_genvoc[-1]:.6e} ppm; rel err = {rel_err:.2%}"
+    assert rel_err < 1e-6, (
+        f"JAX GENVOC at t_final = {jax_genvoc[-1]:.10e} ppm; "
+        f"Fortran = {fortran_genvoc[-1]:.10e} ppm; rel err = {rel_err:.3e}"
     )

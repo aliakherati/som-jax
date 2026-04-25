@@ -5,13 +5,15 @@ Two-panel figure under ``docs/figures/s1.10/``:
 1. ``regression_overview.png``
    - Top: per-species relative L2 bar chart, log-y, with the master-plan
      scientific-faithfulness line (1e-3) and the regression-test
-     tolerance line (1.5e-1) drawn for context.
+     tolerance line (3e-2) drawn for context.
    - Bottom: candidate-vs-reference scatter for all 40 SOM species at
-     ``t = t_final``, log-log, with the y=x diagonal.
+     ``t = t_final``, log-log, with the y=x diagonal and ±3% bands.
 
-The figure is the user-facing rendering of the regression. When a future
-chunk lands a tighter golden (multi-step trajectory, longer endtime), this
-script just re-runs and the bars get smaller.
+The figure is the user-facing rendering of the regression. The Fortran
+reference now runs ``INTEGR2`` with rtol=1e-10 in REAL*8 (per
+``som-tomas-fortran#2``); the residual gap to JAX/diffrax is dominated
+by REAL*4 noise inside the auto-generated SAPRC mechanism callback and
+is well under 3% across the well-resolved cascade.
 """
 
 from __future__ import annotations
@@ -99,14 +101,14 @@ def main() -> int:
 
     # --- Top: per-species relative L2 ----------------------------------
     x = np.arange(n_som)
-    bar_colours = ["#d62728" if v > 0.15 else "#1f77b4" for v in l2]
+    bar_colours = ["#d62728" if v > 0.03 else "#1f77b4" for v in l2]
     ax_l2.bar(x, np.maximum(l2, 1e-12), color=bar_colours, edgecolor="black", linewidth=0.3)
     ax_l2.set_yscale("log")
     ax_l2.set_xticks(x)
     ax_l2.set_xticklabels(som_names, rotation=90, fontsize=6)
     ax_l2.set_ylabel("relative L2 (log scale)")
     ax_l2.axhline(
-        1.5e-1, color="black", linewidth=0.8, linestyle="--", label="regression tol (15%)"
+        3e-2, color="black", linewidth=0.8, linestyle="--", label="regression tol (3%)"
     )
     ax_l2.axhline(
         1e-3,
@@ -120,7 +122,7 @@ def main() -> int:
         f"S1.10 regression: per-species relative L2 (JAX vs Fortran ``_saprcgc.dat``) "
         f"— max = {l2.max():.2%}, median = {np.median(l2):.2%}"
     )
-    ax_l2.set_ylim(1e-5, 2.0)
+    ax_l2.set_ylim(1e-7, 2.0)
     ax_l2.grid(True, which="both", alpha=0.3, linewidth=0.4, axis="y")
 
     # --- Bottom: candidate-vs-reference scatter at t_final --------------
@@ -141,10 +143,10 @@ def main() -> int:
     lo = max(floor, min(f_x.min(), j_y.min()))
     hi = max(f_x.max(), j_y.max()) * 2
     ax_scatter.plot([lo, hi], [lo, hi], "k--", linewidth=0.8, label="y = x")
-    # ±15% bands
-    ax_scatter.plot([lo, hi], [lo * 0.85, hi * 0.85], "gray", linewidth=0.5, linestyle=":")
+    # ±3% bands
+    ax_scatter.plot([lo, hi], [lo * 0.97, hi * 0.97], "gray", linewidth=0.5, linestyle=":")
     ax_scatter.plot(
-        [lo, hi], [lo * 1.15, hi * 1.15], "gray", linewidth=0.5, linestyle=":", label="±15% band"
+        [lo, hi], [lo * 1.03, hi * 1.03], "gray", linewidth=0.5, linestyle=":", label="±3% band"
     )
     ax_scatter.set_xscale("log")
     ax_scatter.set_yscale("log")
