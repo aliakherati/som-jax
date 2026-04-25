@@ -48,7 +48,7 @@ Requires Python ≥ 3.11.
 | `som_jax.oh` | OH-trajectory helpers: `oh_constant`, `oh_linear_ramp`, `oh_piecewise_linear`, `oh_exponential_decay` | alpha (S1.9) |
 | analytic first-order decay test | `[GENVOC](t) = exp(-k_BL20 · OH · t)` within 1e-5 relative (S1.8 headline) | alpha (S1.8) |
 | time-varying-OH decay test | `[GENVOC](t) = exp(-k_BL20 · ∫OH(s) ds)` under a ramp, within 1e-5 relative (S1.9) | alpha (S1.9) |
-| regression suite | Vs Fortran goldens at ≤0.1% relative per species | not started (S1.10–S1.11) |
+| regression suite | Vs Fortran goldens at ≤0.1% relative per species | alpha (S1.10) |
 | differentiability suite | `dLVP` recovery demo via `optax.adam` | not started (S1.17) |
 
 Tracked in the master plan as chunks `S1.0` … `S1.21`.
@@ -98,6 +98,12 @@ Each scientific chunk ships matplotlib figures under `docs/figures/<chunk-id>/`,
 | File | What it shows |
 |---|---|
 | [`docs/figures/s1.9/genvoc_decay_ramp_oh.png`](docs/figures/s1.9/genvoc_decay_ramp_oh.png) | Three-panel. Top: a linear OH ramp. Middle: simulated GENVOC(t) overlaid on `exp(-k · ∫OH(s) ds)` (the exact time-varying-OH analytic). Bottom: relative error, still below 10⁻⁸ across the integration. |
+
+**S1.10 — first Fortran-vs-JAX regression**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.10/regression_overview.png`](docs/figures/s1.10/regression_overview.png) | Top: per-species relative L2 bar chart (log-y) with the 15% regression tolerance line and the 0.1% master-plan faithfulness target. Most species at ~5-10%; tail-cascade species below the 1e-10 ppm floor highlighted red. Bottom: candidate-vs-reference final-time scatter (log-log) for all 40 SOM species, with y=x diagonal and ±15% bands. |
 
 To regenerate any chunk's figures: `python scripts/make_<chunk>_figures.py` (requires `pip install -e ".[dev]"`).
 
