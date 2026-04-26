@@ -103,7 +103,7 @@ Each scientific chunk ships matplotlib figures under `docs/figures/<chunk-id>/`,
 
 | File | What it shows |
 |---|---|
-| [`docs/figures/s1.10/regression_overview.png`](docs/figures/s1.10/regression_overview.png) | Top: per-species relative L2 bar chart (log-y) with the 3% regression tolerance line and the 0.1% master-plan faithfulness target. Median ~0.3%, max ~2.6% on deepest cascade species; below-floor tail species highlighted red. Bottom: candidate-vs-reference final-time scatter (log-log) for all 40 SOM species, with y=x diagonal and ±3% bands. The Fortran reference now runs `INTEGR2` with rtol=1e-10 in REAL*8. |
+| [`docs/figures/s1.10/regression_overview.png`](docs/figures/s1.10/regression_overview.png) | Top: per-species relative L2 bar chart (log-y) with the 3% regression tolerance line and the 0.1% master-plan faithfulness target. Blue = above-floor species the test checks (35/40, max 2.6%, median 0.3%). Gray = 5 below-floor species (peak < 1e-10 ppm) excluded from the test because the Fortran reference is at integrator atol noise. Bottom: candidate-vs-reference final-time scatter for all 40 SOM species with y=x diagonal and ±3% bands. The Fortran reference now runs `INTEGR2` with rtol=1e-10 in REAL\*8. |
 
 To regenerate any chunk's figures: `python scripts/make_<chunk>_figures.py` (requires `pip install -e ".[dev]"`).
 
