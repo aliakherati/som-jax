@@ -107,9 +107,7 @@ def main() -> int:
     ax_l2.set_xticks(x)
     ax_l2.set_xticklabels(som_names, rotation=90, fontsize=6)
     ax_l2.set_ylabel("relative L2 (log scale)")
-    ax_l2.axhline(
-        3e-2, color="black", linewidth=0.8, linestyle="--", label="regression tol (3%)"
-    )
+    ax_l2.axhline(3e-2, color="black", linewidth=0.8, linestyle="--", label="regression tol (3%)")
     ax_l2.axhline(
         1e-3,
         color="gray",
