@@ -48,6 +48,10 @@ dev = [
     "mypy>=1.10",
     # Needed by scripts/make_<chunk>_figures.py — dev-time only, not used at runtime.
     "matplotlib>=3.8",
+    # Needed by tests/regression/* — provides the goldens loader and
+    # tolerance-aware compare primitives. Installed from GitHub since
+    # atmos-jax-common is not on PyPI yet.
+    "atmos-jax-common @ git+https://github.com/aliakherati/atmos-jax-common.git@main",
 ]
 
 [project.urls]
@@ -57,6 +61,11 @@ Issues = "https://github.com/aliakherati/som-jax/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/som_jax"]
+
+[tool.hatch.metadata]
+# Required so we can list `atmos-jax-common @ git+...` as a dev dep.
+# atmos-jax-common is not on PyPI yet; remove this once it is.
+allow-direct-references = true
 
 [tool.ruff]
 line-length = 100
@@ -76,6 +85,8 @@ select = [
 ignore = [
     "PLR0913",  # too many function arguments — scientific code legitimately has many
     "PLR2004",  # magic numbers — unavoidable in numerical code with physical constants
+    "RUF002",   # ambiguous unicode in docstrings — × / ↔ / ³ / ⁻¹ are deliberate markup
+    "RUF003",   # same, in comments
 ]
 
 [tool.ruff.lint.per-file-ignores]
