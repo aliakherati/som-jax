@@ -48,6 +48,9 @@ dev = [
     "mypy>=1.10",
     # Needed by scripts/make_<chunk>_figures.py — dev-time only, not used at runtime.
     "matplotlib>=3.8",
+    # Needed by tests/differentiability/* — gradient-based optimisation
+    # over the simulator (S1.17 recovery demo).
+    "optax>=0.2",
     # Needed by tests/regression/* — provides the goldens loader and
     # tolerance-aware compare primitives. Installed from GitHub since
     # atmos-jax-common is not on PyPI yet.
