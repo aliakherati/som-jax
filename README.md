@@ -50,7 +50,7 @@ Requires Python ≥ 3.11.
 | time-varying-OH decay test | `[GENVOC](t) = exp(-k_BL20 · ∫OH(s) ds)` under a ramp, within 1e-5 relative (S1.9) | alpha (S1.9) |
 | regression suite | Vs Fortran goldens at ≤0.1% relative per species | alpha (S1.10) |
 | property tests | Carbon non-increasing (S1.13), oxygen non-negative (S1.14), non-negativity of all species (S1.15) | alpha (S1.13–S1.15) |
-| differentiability suite | `dLVP` recovery demo via `optax.adam` | not started (S1.17) |
+| differentiability suite | `jax.grad` / `jax.jacrev` through `simulate()` (S1.16); `optax.adam` recovery of OH from precursor decay (S1.17). Headline test of the JAX port's payoff. | alpha (S1.16, S1.17) |
 
 Tracked in the master plan as chunks `S1.0` … `S1.21`.
 
@@ -111,6 +111,18 @@ Each scientific chunk ships matplotlib figures under `docs/figures/<chunk-id>/`,
 | File | What it shows |
 |---|---|
 | [`docs/figures/s1.13/conservation_overview.png`](docs/figures/s1.13/conservation_overview.png) | Three-panel. Top: total grid carbon C(t) over a 24h baseline run — monotonically non-increasing, drops 1.12% to documented off-grid fragmentation sinks (S1.13). Middle: total grid oxygen O(t) — starts at 0 with pure GENVOC, grows non-negatively as oxidation populates O>0 cells (S1.14; in this run it happens to be monotonic too, but the test only enforces non-negativity since deeper cascades trigger off-grid losses that take O atoms with them). Bottom: min(y(t)) across all 41 species — symlog scale; the curve sits at exactly zero, well above the -1e-12 ppm tolerance (S1.15). |
+
+**S1.16 — Jacobian agreement**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.16/jacobian_overview.png`](docs/figures/s1.16/jacobian_overview.png) | Three-panel. Top: GENVOC(t) at three OH levels showing the smooth dependence of the trajectory on the parameter. Middle: `∂[GENVOC](t) / ∂OH` from `jax.jacrev` overlaid on a central-difference reference — visually identical curves. Bottom: relative error between the two; sits below 1e-7 throughout the trajectory, well under the 1% master-plan tolerance line. |
+
+**S1.17 — `optax.adam` parameter recovery (headline differentiability demo)**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.17/optax_recovery.png`](docs/figures/s1.17/optax_recovery.png) | Three-panel. Top: target GENVOC(t) generated at `oh_scale = 2.0`, with the initial-guess trajectory at `oh_scale = 0.6` (3.3× off) and the recovered trajectory after 200 Adam iterations. Middle: the parameter `oh_scale` vs iteration — overshoots briefly, then settles to 2.000. Bottom: log loss vs iteration — drops ~10⁹× across the run. Demonstrates the JAX port's headline payoff: gradient-based parameter inference through the full simulator. |
 
 To regenerate any chunk's figures: `python scripts/make_<chunk>_figures.py` (requires `pip install -e ".[dev]"`).
 
