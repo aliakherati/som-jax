@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Figures: `docs/figures/s1.16/jacobian_overview.png` (smoothness in OH + autodiff vs central-diff overlay + relative error) and `docs/figures/s1.17/optax_recovery.png` (target/initial/recovered trajectories + parameter trajectory + log loss vs iteration).
 - Total: **76 tests pass** (5 new differentiability tests + 71 pre-existing).
 
+- **S1.18 — k_scale identifiability scan**: `tests/differentiability/test_k_scale_identifiability.py` extends S1.17 from a single-scalar fit (OH) to a joint fit of all 39 per-reaction rate-constant scales. The simulator runs with `k_OH * rate_scales`; `dataclasses.replace` produces a fresh PyTree-registered `SOMNetwork` with scaled rates so each `rate_scales[i]` is differentiable end-to-end. Generates a target trajectory at `BL20 = 1.5×` (other rates 1×), initialises Adam with all-1s, and recovers BL20 within 2% in 200 iterations while leaving "uninvolved" rates pinned near 1.0. Per master plan this is a **scientific finding, not a binary pass/fail**: the GENSOMG cascade is highly correlated between neighbouring grid cells, so many rate constants can't be uniquely identified from precursor + cascade observations alone. Three tests pin: (1) BL20 recovery, (2) loss decreases >100× in 50 iters, (3) at least 5 of 39 scales stay within 5% of 1.0 after the joint fit. Total: **79 tests pass** (3 new).
+- Figures: `docs/figures/s1.18/identifiability_scan.png` (recovered-scales bar chart + log loss curve) and `docs/figures/s1.18/per_rate_sensitivity.png` (per-rate trajectory sensitivity sorted high-to-low; BL20 tops the list, rates spread over 4 orders of magnitude).
+
 ## [0.1.0] — planned
 
 First usable release. Gate: all 10 canonical Fortran goldens match within 0.1% relative L2 per species; `dLVP` recovery differentiability test passes.
