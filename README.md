@@ -52,6 +52,7 @@ Requires Python ≥ 3.11.
 | canonical-matrix regression | 8 in-scope runs from atmos-jax-common's matrix; tier-1 species (GENVOC + 2 first-gen) match Fortran ≤1% across endtime/OH/VOC sweeps | alpha (S1.11) |
 | property tests | Carbon non-increasing (S1.13), oxygen non-negative (S1.14), non-negativity of all species (S1.15) | alpha (S1.13–S1.15) |
 | differentiability suite | `jax.grad` / `jax.jacrev` through `simulate()` (S1.16); `optax.adam` recovery of OH from precursor decay (S1.17). Headline test of the JAX port's payoff. | alpha (S1.16, S1.17) |
+| identifiability scan | Joint Adam fit of all 39 rate-constant scales after perturbing BL20; well-identified rates recover, soft directions stay near 1.0 (S1.18). | alpha (S1.18) |
 
 Tracked in the master plan as chunks `S1.0` … `S1.21`.
 
@@ -119,6 +120,13 @@ Each scientific chunk ships matplotlib figures under `docs/figures/<chunk-id>/`,
 |---|---|
 | [`docs/figures/s1.11/tier1_overview.png`](docs/figures/s1.11/tier1_overview.png) | 8-panel grid (one per in-scope canonical run) showing GENVOC(t) trajectories from JAX (dashed, family-coloured) overlaid on Fortran (solid black). Panels labeled with the worst-case tier-1 relative L2 (always below 1%). Visual confirmation that JAX matches Fortran across the matrix at the precursor + first-gen level. |
 | [`docs/figures/s1.11/cascade_nonlinearity.png`](docs/figures/s1.11/cascade_nonlinearity.png) | Bar chart of the `high_voc / long_baseline` final-time ratio per species. Linear chemistry expects exactly 10×; JAX (green) hits 10× across the entire cascade; Fortran (black) drops to ~2.5× on deep-cascade species — REAL\*4 truncation in `DIFUN`'s `RKZ × C × C` products amplifies with cascade depth and absolute magnitude. Motivates why S1.11 restricts the regression to tier-1 (cascade comparison becomes meaningful again once `saprc14_rev1.f` is REAL\*8). |
+
+**S1.18 — k_scale identifiability**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.18/identifiability_scan.png`](docs/figures/s1.18/identifiability_scan.png) | Two-panel. Top: bar chart of all 39 recovered rate-constant scales after a joint Adam optimisation against a target trajectory generated with BL20 perturbed to 1.5×. The perturbed rate (green) recovers exactly; all other rates stay essentially at 1.0 — the optimiser correctly identifies which knob produced the change. Bottom: log loss curve dropping ~10⁷× over 200 iterations. |
+| [`docs/figures/s1.18/per_rate_sensitivity.png`](docs/figures/s1.18/per_rate_sensitivity.png) | Per-rate sensitivity ranking (sorted high-to-low). Each bar = how much a 10% bump in that rate alone changes the GENVOC + cascade trajectory. BL20 (green) is the most sensitive (~2 units relative L2); a handful of cascade rates (S33–S38, the C=7 series) cluster at 0.3-1.5; the rest spread over four orders of magnitude down to ~10⁻⁴. The "soft directions" of the inverse problem — rates that produce nearly-identical trajectories under chamber observation. Document of which rates are well-identified from precursor + cascade data alone. |
 
 **S1.16 — Jacobian agreement**
 
