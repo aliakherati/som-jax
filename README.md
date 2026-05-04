@@ -42,14 +42,15 @@ Requires Python ≥ 3.11.
 | `data/mechanisms/gensomg.json` | Committed GENSOMG network (41 species, 39 reactions) | alpha (S1.1) |
 | `som_jax.mechanism.network` | `SOMNetwork` PyTree (dense stoichiometry, rate constants as `jax.numpy`) | alpha (S1.4) |
 | `som_jax.rhs` | ODE right-hand side: `stoich.T @ (k · OH · y[reactant_idx])` | alpha (S1.6) |
-| `som_jax.simulate` | Public `simulate(network, initial, oh, t_span, save_at)` using `diffrax.Kvaerno5`. Accepts scalar OH or a `Callable[[Array], Array]`. | alpha (S1.7, S1.9) |
+| `som_jax.simulate` | Public `simulate(network, initial, oh, t_span, save_at, temperature_K=None)` using `diffrax.Kvaerno5`. Accepts scalar OH or a `Callable[[Array], Array]`; passing `temperature_K` swaps in T-dependent rates via `SOMNetwork.k_OH_at(T)`. | alpha (S1.7, S1.9) |
+| `SOMNetwork.k_OH_at(T)` | Per-reaction rate constants evaluated at a given temperature via the SAPRC Arrhenius formula `k(T) = A·exp(-Ea/(R·T))·(T/T_ref)^B`. BL20 has B=-1; SOM cascade rates are T-independent. Differentiable through `jax.grad`. | alpha |
 | `som_jax.build_initial` | Helper: `{name: value}` dict → `(n_species,)` initial-condition array | alpha (S1.7) |
 | `SOMTrajectory` | PyTree wrapping `(t, y, species_names)` with a `.y_of(name)` accessor | alpha (S1.7) |
 | `som_jax.oh` | OH-trajectory helpers: `oh_constant`, `oh_linear_ramp`, `oh_piecewise_linear`, `oh_exponential_decay` | alpha (S1.9) |
 | analytic first-order decay test | `[GENVOC](t) = exp(-k_BL20 · OH · t)` within 1e-5 relative (S1.8 headline) | alpha (S1.8) |
 | time-varying-OH decay test | `[GENVOC](t) = exp(-k_BL20 · ∫OH(s) ds)` under a ramp, within 1e-5 relative (S1.9) | alpha (S1.9) |
 | regression suite | Vs Fortran goldens at ≤0.1% relative per species | alpha (S1.10) |
-| canonical-matrix regression | 8 in-scope runs from atmos-jax-common's matrix; tier-1 species (GENVOC + 2 first-gen) match Fortran ≤1% across endtime/OH/VOC sweeps | alpha (S1.11) |
+| canonical-matrix regression | All 10 runs from atmos-jax-common's matrix (incl. cold 273 K / hot 323 K via T-dependent rates); tier-1 species match Fortran ≤1.5% across endtime/OH/VOC/T sweeps | alpha (S1.11) |
 | property tests | Carbon non-increasing (S1.13), oxygen non-negative (S1.14), non-negativity of all species (S1.15) | alpha (S1.13–S1.15) |
 | differentiability suite | `jax.grad` / `jax.jacrev` through `simulate()` (S1.16); `optax.adam` recovery of OH from precursor decay (S1.17). Headline test of the JAX port's payoff. | alpha (S1.16, S1.17) |
 | identifiability scan | Joint Adam fit of all 39 rate-constant scales after perturbing BL20; well-identified rates recover, soft directions stay near 1.0 (S1.18). | alpha (S1.18) |

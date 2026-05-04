@@ -28,6 +28,7 @@ References
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -137,6 +138,7 @@ def simulate(
     t_span: tuple[float, float],
     save_at: Array | Iterable[float],
     *,
+    temperature_K: float | Array | None = None,
     rtol: float = 1e-6,
     atol: float = 1e-14,
     max_steps: int = 10_000,
@@ -163,6 +165,16 @@ def simulate(
     save_at
         Times at which to save the state. Must satisfy ``t0 <= t <= t1`` and
         be monotonically increasing.
+    temperature_K
+        Optional integration temperature in kelvin. When supplied, the
+        simulator uses ``network.k_OH_at(temperature_K)`` instead of the
+        298 K reference rates stored in ``network.k_OH``. For SOM cascade
+        reactions the .doc lists no Arrhenius coefficients, so they remain
+        T-independent (the network's ``arrhenius_b = 0`` for those entries
+        and the result equals ``k_OH``). The precursor BL20 rate carries a
+        ``B = -1`` exponent in the SAPRC convention; at chamber-cold
+        ``T = 273 K`` the BL20 rate is ~9% higher than at 298 K, at
+        chamber-warm ``T = 323 K`` it's ~7% lower.
     rtol, atol
         Relative and absolute tolerances for the PI step-size controller.
         Defaults target ≤0.1% scientific-faithfulness bar from the master
@@ -193,6 +205,13 @@ def simulate(
 
     solver = solver if solver is not None else diffrax.Kvaerno5()
     adjoint = adjoint if adjoint is not None else diffrax.RecursiveCheckpointAdjoint()
+
+    if temperature_K is not None:
+        # Replace the network's k_OH with the T-dependent rates. Using
+        # dataclasses.replace produces a new PyTree-registered SOMNetwork
+        # where the new k_OH is traced through the simulator (so the
+        # gradient w.r.t. temperature_K flows back via Arrhenius).
+        network = dataclasses.replace(network, k_OH=network.k_OH_at(temperature_K))
 
     oh_callable = as_oh_callable(oh)
     term = diffrax.ODETerm(_make_vector_field(oh_callable))

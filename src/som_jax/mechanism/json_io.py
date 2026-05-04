@@ -21,7 +21,13 @@ from som_jax.mechanism.types import (
     Species,
 )
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
+# v2 (this version): added optional Arrhenius parametrisation
+#   (arrhenius_a, arrhenius_ea_kcal_per_mol, arrhenius_b) per reaction.
+# v1: rate_cm3_per_mol_per_s only.
+# Loader accepts v1 by treating Arrhenius fields as None (T-independent
+# at the listed rate).
+_OLDEST_SUPPORTED_SCHEMA = 1
 
 
 def _species_to_dict(sp: Species) -> dict[str, Any]:
@@ -55,7 +61,7 @@ def _product_from_dict(d: dict[str, Any]) -> Product:
 
 
 def _reaction_to_dict(r: Reaction) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "label": r.label,
         "reactants": list(r.reactants),
         "products": [_product_to_dict(p) for p in r.products],
@@ -63,6 +69,15 @@ def _reaction_to_dict(r: Reaction) -> dict[str, Any]:
         "source_line_mod": r.source_line_mod,
         "source_line_doc": r.source_line_doc,
     }
+    if (
+        r.arrhenius_a is not None
+        or r.arrhenius_ea_kcal_per_mol is not None
+        or r.arrhenius_b is not None
+    ):
+        payload["arrhenius_a"] = r.arrhenius_a
+        payload["arrhenius_ea_kcal_per_mol"] = r.arrhenius_ea_kcal_per_mol
+        payload["arrhenius_b"] = r.arrhenius_b
+    return payload
 
 
 def _reaction_from_dict(d: dict[str, Any]) -> Reaction:
@@ -73,6 +88,13 @@ def _reaction_from_dict(d: dict[str, Any]) -> Reaction:
         rate_cm3_per_mol_per_s=float(d["rate_cm3_per_mol_per_s"]),
         source_line_mod=int(d["source_line_mod"]),
         source_line_doc=int(d["source_line_doc"]),
+        arrhenius_a=(float(d["arrhenius_a"]) if d.get("arrhenius_a") is not None else None),
+        arrhenius_ea_kcal_per_mol=(
+            float(d["arrhenius_ea_kcal_per_mol"])
+            if d.get("arrhenius_ea_kcal_per_mol") is not None
+            else None
+        ),
+        arrhenius_b=(float(d["arrhenius_b"]) if d.get("arrhenius_b") is not None else None),
     )
 
 
@@ -114,10 +136,11 @@ def mechanism_to_json(mech: Mechanism, path: Path | str) -> None:
 def mechanism_from_json(path: Path | str) -> Mechanism:
     """Read a :class:`Mechanism` previously written by :func:`mechanism_to_json`."""
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    if raw.get("schema_version") != _SCHEMA_VERSION:
+    schema = raw.get("schema_version")
+    if not (_OLDEST_SUPPORTED_SCHEMA <= schema <= _SCHEMA_VERSION):
         raise ValueError(
-            f"unsupported schema_version={raw.get('schema_version')!r}; "
-            f"this som-jax build expects {_SCHEMA_VERSION}"
+            f"unsupported schema_version={schema!r}; this som-jax build "
+            f"reads versions {_OLDEST_SUPPORTED_SCHEMA}..{_SCHEMA_VERSION}"
         )
     metadata_raw = raw.get("metadata")
     metadata = _metadata_from_dict(metadata_raw) if metadata_raw is not None else None

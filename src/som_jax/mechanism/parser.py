@@ -85,14 +85,29 @@ _PRECURSOR_CARD_RE = re.compile(
     re.VERBOSE,
 )
 
-# Rate-constant line in .doc.
-# Format: "  285  BL20     8.319E+03  (...)   GENVOC + OH = ..."
-#         "  359  S1.1     1.759E+03            GENSOMG_02_01 + OH = ..."
+# Rate-constant line in .doc. Two shapes:
+#   "  285  BL20     8.319E+03 (  8.264E+03  0.00 -1.000)   GENVOC + OH = ..."
+#   "  359  S1.1     1.759E+03                              GENSOMG_02_01 + OH = ..."
+# The optional parenthesised triplet is (A, Ea, B) for the Arrhenius form
+# k(T) = A * exp(-Ea/(R*T)) * (T/Tref)^B, where Tref=300 K and R=0.0019872
+# kcal/mol/K (the SAPRC convention; see the .doc header). For BL20 the
+# triplet is present; for the SOM grid reactions (S1.1..S38.1) the rate is
+# given as a single value implicitly evaluated at 298 K and treated as
+# T-independent in Fortran's compiled mechanism.
 _RATE_LINE_RE = re.compile(
     r"""^
     \s*(?P<rxn_idx>\d+)                  # reaction sequence number in .doc
     \s+(?P<label>[A-Z][A-Z0-9.]*)        # label (BL20, S1.1, S38.1, etc.)
     \s+(?P<rate>[+\-]?\d+\.?\d*[eE][+\-]?\d+)
+    (?:                                  # optional Arrhenius triplet
+        \s*\(\s*
+        (?P<arrhenius_a>[+\-]?\d+\.?\d*[eE][+\-]?\d+)
+        \s+
+        (?P<arrhenius_ea>[+\-]?\d+\.?\d*)
+        \s+
+        (?P<arrhenius_b>[+\-]?\d+\.?\d*)
+        \s*\)
+    )?
     """,
     re.VERBOSE,
 )
@@ -273,20 +288,25 @@ def _parse_reactions_without_rates(
     return out
 
 
-def _parse_rates(doc_text: str) -> tuple[dict[str, tuple[int, float]], dict[str, str]]:
+def _parse_rates(
+    doc_text: str,
+) -> tuple[dict[str, tuple[int, float, float | None, float | None, float | None]], dict[str, str]]:
     """Extract rate constants for BL20 (GENVOC+OH) and S{1..38}.1 (GENSOMG).
 
     Returns
     -------
     rates
-        ``{label: (source_line, k_cm3_per_mol_per_s)}``. Labels are ``"BL20"``
-        and ``"S1.1"`` … ``"S38.1"``.
+        ``{label: (source_line, k_298, A, Ea, B)}``. Labels are ``"BL20"``
+        and ``"S1.1"`` … ``"S38.1"``. ``A``/``Ea``/``B`` are the Arrhenius
+        triplet from the ``.doc`` if present, else ``None`` for reactions
+        listed as constant rates (no temperature dependence in the
+        Fortran compiled mechanism).
     label_sequence
         ``{ordinal: label}`` giving the order ``S1.1, S2.1, …`` as they appear
         in ``.doc``. Callers use this to align rates with reactions parsed from
         ``.mod`` by position.
     """
-    rates: dict[str, tuple[int, float]] = {}
+    rates: dict[str, tuple[int, float, float | None, float | None, float | None]] = {}
     s_order: list[tuple[int, str]] = []  # (rxn_idx_from_doc, label)
     for lineno, line in enumerate(doc_text.splitlines(), start=1):
         m = _RATE_LINE_RE.match(line)
@@ -295,7 +315,13 @@ def _parse_rates(doc_text: str) -> tuple[dict[str, tuple[int, float]], dict[str,
         label = m.group("label")
         if label == "BL20" or re.fullmatch(r"S\d+\.1", label):
             rate = float(m.group("rate"))
-            rates[label] = (lineno, rate)
+            a_str = m.group("arrhenius_a")
+            ea_str = m.group("arrhenius_ea")
+            b_str = m.group("arrhenius_b")
+            arrhenius_a = float(a_str) if a_str is not None else None
+            arrhenius_ea = float(ea_str) if ea_str is not None else None
+            arrhenius_b = float(b_str) if b_str is not None else None
+            rates[label] = (lineno, rate, arrhenius_a, arrhenius_ea, arrhenius_b)
             if label.startswith("S"):
                 s_order.append((int(m.group("rxn_idx")), label))
     # Preserve .doc ordering for S labels.
@@ -377,13 +403,16 @@ def parse_mechanism(
         else:
             label = f"S{s_index}.1"
             s_index += 1
-        source_line_doc, rate = rates[label]
+        source_line_doc, rate, arr_a, arr_ea, arr_b = rates[label]
         reactions.append(
             Reaction(
                 label=label,
                 reactants=tuple(r.strip() for r in reactants),
                 products=products,
                 rate_cm3_per_mol_per_s=rate,
+                arrhenius_a=arr_a,
+                arrhenius_ea_kcal_per_mol=arr_ea,
+                arrhenius_b=arr_b,
                 source_line_mod=source_line_mod,
                 source_line_doc=source_line_doc,
             )

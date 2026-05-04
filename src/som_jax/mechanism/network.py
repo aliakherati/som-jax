@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar
 
 import jax
 import jax.numpy as jnp
@@ -73,6 +74,15 @@ class SOMNetwork:
     oh_reactant_idx: Array
     stoich: Array
     k_OH: Array
+    # Arrhenius parametrisation per reaction. For reactions listed as
+    # constant rates in ``.doc`` (no Arrhenius triplet), we set
+    # ``arrhenius_a = k_OH``, ``arrhenius_ea = 0``, ``arrhenius_b = 0`` so
+    # ``k_OH_at(T)`` is T-independent and equal to ``k_OH``. Reactions with
+    # an explicit Arrhenius triplet (currently only BL20 in GENSOMG) carry
+    # the values from ``.doc``. See :meth:`k_OH_at`.
+    arrhenius_a: Array
+    arrhenius_ea_kcal_per_mol: Array
+    arrhenius_b: Array
 
     # --- basic accessors -------------------------------------------------
 
@@ -98,6 +108,32 @@ class SOMNetwork:
         except ValueError as exc:  # pragma: no cover - defensive
             raise KeyError(f"reaction {label!r} not in network") from exc
 
+    # --- temperature-dependent rates -----------------------------------
+
+    # SAPRC convention from saprc14_rev1.doc:
+    #     k(T) = A * exp(-Ea / (R * T)) * (T / T_ref) ** B
+    # with R = 0.0019872 kcal/mol/K and T_ref = 300 K. For SOM reactions
+    # the .doc lists Ea = 0 throughout, so the exponential factor is
+    # always 1 and only the (T / T_ref) ** B power-law term varies. We
+    # implement the standard form for forward-compatibility with future
+    # SAPRC reactions that carry non-zero Ea.
+    R_KCAL_PER_MOL_PER_K: ClassVar[float] = 0.0019872
+    T_REF_K: ClassVar[float] = 300.0
+
+    def k_OH_at(self, temperature_K: float | Array) -> Array:
+        """Return per-reaction rate constants evaluated at ``temperature_K``.
+
+        ``T`` may be a Python float or a JAX array (scalar). Differentiable
+        through ``jax.grad`` w.r.t. ``T``. For reactions with no Arrhenius
+        triplet in the source mechanism (the SOM cascade), the stored
+        ``arrhenius_a = k_OH`` and ``arrhenius_b = 0`` make the result
+        T-independent and equal to :attr:`k_OH`.
+        """
+        T = jnp.asarray(temperature_K, dtype=self.k_OH.dtype)
+        exp_term = jnp.exp(-self.arrhenius_ea_kcal_per_mol / (self.R_KCAL_PER_MOL_PER_K * T))
+        power_term = (T / self.T_REF_K) ** self.arrhenius_b
+        return self.arrhenius_a * exp_term * power_term
+
     # --- PyTree registration --------------------------------------------
 
     def tree_flatten(
@@ -111,6 +147,9 @@ class SOMNetwork:
             self.oh_reactant_idx,
             self.stoich,
             self.k_OH,
+            self.arrhenius_a,
+            self.arrhenius_ea_kcal_per_mol,
+            self.arrhenius_b,
         )
         aux = (self.species_names, self.reaction_labels)
         return children, aux
@@ -130,6 +169,9 @@ class SOMNetwork:
             oh_reactant_idx,
             stoich,
             k_OH,
+            arrhenius_a,
+            arrhenius_ea_kcal_per_mol,
+            arrhenius_b,
         ) = children
         return cls(
             species_names=species_names,
@@ -141,6 +183,9 @@ class SOMNetwork:
             oh_reactant_idx=oh_reactant_idx,
             stoich=stoich,
             k_OH=k_OH,
+            arrhenius_a=arrhenius_a,
+            arrhenius_ea_kcal_per_mol=arrhenius_ea_kcal_per_mol,
+            arrhenius_b=arrhenius_b,
         )
 
     # --- factories ------------------------------------------------------
@@ -168,6 +213,9 @@ class SOMNetwork:
         stoich = np.zeros((n_reactions, n_species), dtype=np.float64)
         oh_reactant_idx = np.zeros(n_reactions, dtype=np.int32)
         k_OH = np.zeros(n_reactions, dtype=np.float64)
+        arrhenius_a = np.zeros(n_reactions, dtype=np.float64)
+        arrhenius_ea = np.zeros(n_reactions, dtype=np.float64)
+        arrhenius_b = np.zeros(n_reactions, dtype=np.float64)
 
         for i, rxn in enumerate(mechanism.reactions):
             reactant_name = rxn.reactants[0]  # always GENVOC or GENSOMG_xx_yy
@@ -179,6 +227,18 @@ class SOMNetwork:
                 # Use += so duplicate products in one reaction accumulate.
                 stoich[i, p_idx] += product.yield_
             k_OH[i] = rxn.rate_cm3_per_mol_per_s
+            # If a reaction has no Arrhenius triplet in .doc (constant rate),
+            # we set A = k(298) with B = 0 so k_OH_at(T) is T-independent
+            # and equal to the listed k. Reactions with the triplet (e.g.
+            # BL20) carry the A / Ea / B values from the .doc.
+            if rxn.arrhenius_a is None:
+                arrhenius_a[i] = rxn.rate_cm3_per_mol_per_s
+                arrhenius_ea[i] = 0.0
+                arrhenius_b[i] = 0.0
+            else:
+                arrhenius_a[i] = rxn.arrhenius_a
+                arrhenius_ea[i] = rxn.arrhenius_ea_kcal_per_mol or 0.0
+                arrhenius_b[i] = rxn.arrhenius_b or 0.0
 
         carbon = np.array([sp.carbon for sp in mechanism.species], dtype=np.int32)
         oxygen = np.array([sp.oxygen for sp in mechanism.species], dtype=np.int32)
@@ -195,6 +255,9 @@ class SOMNetwork:
             oh_reactant_idx=jnp.asarray(oh_reactant_idx),
             stoich=jnp.asarray(stoich),
             k_OH=jnp.asarray(k_OH),
+            arrhenius_a=jnp.asarray(arrhenius_a),
+            arrhenius_ea_kcal_per_mol=jnp.asarray(arrhenius_ea),
+            arrhenius_b=jnp.asarray(arrhenius_b),
         )
 
     @classmethod
