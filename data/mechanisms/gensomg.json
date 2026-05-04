@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "family": "GENSOMG",
   "precursor": "GENVOC",
   "grid": {
@@ -367,7 +367,10 @@
       ],
       "rate_cm3_per_mol_per_s": 8319.0,
       "source_line_mod": 1098,
-      "source_line_doc": 932
+      "source_line_doc": 932,
+      "arrhenius_a": 8264.0,
+      "arrhenius_ea_kcal_per_mol": 0.0,
+      "arrhenius_b": -1.0
     },
     {
       "label": "S1.1",
@@ -3838,7 +3841,7 @@
   ],
   "metadata": {
     "parser_version": "0.1.0",
-    "parsed_at_utc": "2026-04-22T06:20:08+00:00",
+    "parsed_at_utc": "2026-05-04T06:01:26+00:00",
     "source_files": [
       {
         "path": "saprc14_rev1.mod",

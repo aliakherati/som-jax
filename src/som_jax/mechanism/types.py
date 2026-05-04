@@ -96,9 +96,16 @@ class Reaction:
     products
         RHS :class:`Product` list.
     rate_cm3_per_mol_per_s
-        Bimolecular rate constant at 300 K in cm³ mol⁻¹ s⁻¹, as read from
-        ``.doc``. For Arrhenius forms, this is the evaluated value at 300 K
-        rather than the pre-exponential ``A``.
+        Bimolecular rate constant evaluated at 298 K in cm³ mol⁻¹ s⁻¹,
+        as read from ``.doc``. This is the value used by the simulator
+        when no explicit temperature is supplied.
+    arrhenius_a, arrhenius_ea_kcal_per_mol, arrhenius_b
+        Optional Arrhenius parametrisation read from the parenthesised
+        triplet in ``.doc``: ``k(T) = A * exp(-Ea/(R*T)) * (T/Tref)^B``,
+        with ``R = 0.0019872 kcal/mol/K`` and ``Tref = 300 K``. Only
+        BL20 carries this triplet in the GENSOMG mechanism; the SOM
+        cascade reactions (S1.1..S38.1) are listed as constant rates
+        and their fields are ``None`` (treated as T-independent).
     source_line_mod
         1-based line number in ``.mod`` where this reaction begins (``T`` line).
     source_line_doc
@@ -111,6 +118,9 @@ class Reaction:
     rate_cm3_per_mol_per_s: float
     source_line_mod: int
     source_line_doc: int
+    arrhenius_a: float | None = None
+    arrhenius_ea_kcal_per_mol: float | None = None
+    arrhenius_b: float | None = None
 
     @property
     def total_yield(self) -> float:
