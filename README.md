@@ -4,23 +4,24 @@ Differentiable Python/JAX implementation of the **Statistical Oxidation Model (S
 
 **Why a port?** JAX gives us:
 
-- `jax.grad` / `optax` through the full simulator → parameter estimation against chamber data (e.g., `dLVP`, fragmentation probability, per-reaction rate scaling).
+- `jax.grad` / `jax.jacrev` / `optax` through the full simulator → parameter estimation against chamber data. Working today: OH-input recovery (S1.17), per-reaction rate-scale identifiability scan (S1.18). On the roadmap once `tomas-jax` lands: `dLVP`, accommodation coefficient, fragmentation parameters.
 - JIT compilation + GPU capability without a Fortran toolchain.
 - Composability with the sibling packages (`saprc-jax`, `tomas-jax`) for full-box atmospheric simulations.
 
 ## Status
 
-**Early alpha — scaffolding only.** Current state:
+**Alpha — public API working.** As of S1.18:
 
-- Repository created, package skeleton installable.
-- CI configured (pytest + ruff + mypy).
-- No public API yet. Reaction network, ODE solver, and simulate API land incrementally.
+- 89 tests pass on macOS + Ubuntu, Python 3.11/3.12 (CI green on every PR).
+- Public API: `simulate`, `build_initial`, `SOMNetwork`, `SOMTrajectory`, `som_rhs`, `som_jax.oh.*` builders, `som_jax.mechanism.parser`.
+- Shipped: mechanism parser + JSON serialiser, dense PyTree `SOMNetwork`, `diffrax.Kvaerno5` simulator with constant + callable OH, analytic-decay correctness checks, Fortran-vs-JAX regression at <1% on tier-1 species across an 8-run canonical matrix, conservation property tests, gradient-through-simulator headline (Adam recovery of OH and joint fits over all 39 rate scales).
+- Pending the v0.1.0 release gate: T-dependent rate constants (unblocks `cold`/`hot` runs in the regression matrix), AR1SOMG family, end-to-end notebook polish, and tagging.
 
 ## Scope
 
 `som-jax` is **gas-phase only**. It integrates the SOM oxidation network under a prescribed OH(t) trajectory; it does not partition products into the condensed phase. Partitioning (equilibrium or kinetic) lives in `tomas-jax` once that repo comes online.
 
-Target species family (v1): `GENSOMG` — 47 species on a 7×7 (C, O) grid, 38 OH-reactions. `AR1SOMG` (alkylaromatic SOM) is a follow-up.
+Target species family (v1): `GENSOMG` — 41 species (GENVOC precursor + 40 grid cells) and 39 OH-reactions. `AR1SOMG` (alkylaromatic SOM) is a follow-up.
 
 ## Install
 
@@ -31,6 +32,64 @@ pip install -e ".[dev]"
 ```
 
 Requires Python ≥ 3.11.
+
+## Quick start
+
+A 4-hour GENVOC oxidation run at constant OH:
+
+```python
+from jax import config
+config.update("jax_enable_x64", True)  # SOM ODEs need float64
+
+import jax.numpy as jnp
+from som_jax import build_initial, simulate
+from som_jax.mechanism import SOMNetwork
+
+network = SOMNetwork.from_json("data/mechanisms/gensomg.json")
+y0 = build_initial(network, {"GENVOC": 0.05})  # 0.05 ppm precursor
+
+# OH = 1.5e6 molec/cm^3 at 298 K, 1 atm == 6.09e-8 ppm. Convert via
+# atmos_jax_common.units.molec_cm3_to_ppm if you have it installed.
+oh_ppm = 6.090601e-08
+
+traj = simulate(
+    network,
+    y0,
+    oh=oh_ppm,
+    t_span=(0.0, 240.0),               # minutes
+    save_at=jnp.linspace(0.0, 240.0, 49),
+    rtol=1e-10,
+    atol=1e-30,
+)
+
+print("[GENVOC] at t=4h:", float(traj.y_of("GENVOC")[-1]))  # ~0.0443 ppm
+```
+
+Differentiability — recover OH from a target trajectory via `optax.adam`:
+
+```python
+import jax
+import optax
+
+def loss(oh):
+    pred = simulate(network, y0, oh=oh, t_span=(0.0, 240.0),
+                    save_at=jnp.linspace(0.0, 240.0, 9),
+                    rtol=1e-8, atol=1e-15).y_of("GENVOC")
+    return jnp.sum((pred - target_traj) ** 2)
+
+opt = optax.adam(learning_rate=1e-9)
+state = opt.init(oh_init := jnp.asarray(3e-8))
+
+@jax.jit
+def step(oh, state):
+    g = jax.grad(loss)(oh)
+    updates, state = opt.update(g, state)
+    return optax.apply_updates(oh, updates), state
+
+# 200 iters → recovers the OH that produced `target_traj` to ~2%.
+```
+
+A self-contained end-to-end demo (load Fortran golden, simulate, overlay, recover OH) lives at [`examples/fortran_compare.ipynb`](examples/fortran_compare.ipynb).
 
 ## Project status
 
