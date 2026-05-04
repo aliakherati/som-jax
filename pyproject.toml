@@ -97,6 +97,11 @@ ignore = [
 # Figure-generation scripts are inherently long sequences of plt calls.
 # PLR0915 (too many statements) fires unhelpfully on otherwise-clear code.
 "scripts/make_*_figures.py" = ["PLR0915"]
+# The Fortran-compare notebook deliberately interleaves config.update
+# (which must run *before* jax.numpy imports) with the import block, so
+# E402 fires cosmetically. We also relax line-length and zip-strict
+# rules in notebook cells where readability beats lint compliance.
+"examples/*.ipynb" = ["E402", "E501", "B905"]
 
 [tool.mypy]
 python_version = "3.11"
