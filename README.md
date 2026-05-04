@@ -49,6 +49,7 @@ Requires Python ≥ 3.11.
 | analytic first-order decay test | `[GENVOC](t) = exp(-k_BL20 · OH · t)` within 1e-5 relative (S1.8 headline) | alpha (S1.8) |
 | time-varying-OH decay test | `[GENVOC](t) = exp(-k_BL20 · ∫OH(s) ds)` under a ramp, within 1e-5 relative (S1.9) | alpha (S1.9) |
 | regression suite | Vs Fortran goldens at ≤0.1% relative per species | alpha (S1.10) |
+| canonical-matrix regression | 8 in-scope runs from atmos-jax-common's matrix; tier-1 species (GENVOC + 2 first-gen) match Fortran ≤1% across endtime/OH/VOC sweeps | alpha (S1.11) |
 | property tests | Carbon non-increasing (S1.13), oxygen non-negative (S1.14), non-negativity of all species (S1.15) | alpha (S1.13–S1.15) |
 | differentiability suite | `jax.grad` / `jax.jacrev` through `simulate()` (S1.16); `optax.adam` recovery of OH from precursor decay (S1.17). Headline test of the JAX port's payoff. | alpha (S1.16, S1.17) |
 
@@ -111,6 +112,13 @@ Each scientific chunk ships matplotlib figures under `docs/figures/<chunk-id>/`,
 | File | What it shows |
 |---|---|
 | [`docs/figures/s1.13/conservation_overview.png`](docs/figures/s1.13/conservation_overview.png) | Three-panel. Top: total grid carbon C(t) over a 24h baseline run — monotonically non-increasing, drops 1.12% to documented off-grid fragmentation sinks (S1.13). Middle: total grid oxygen O(t) — starts at 0 with pure GENVOC, grows non-negatively as oxidation populates O>0 cells (S1.14; in this run it happens to be monotonic too, but the test only enforces non-negativity since deeper cascades trigger off-grid losses that take O atoms with them). Bottom: min(y(t)) across all 41 species — symlog scale; the curve sits at exactly zero, well above the -1e-12 ppm tolerance (S1.15). |
+
+**S1.11 — canonical-matrix regression**
+
+| File | What it shows |
+|---|---|
+| [`docs/figures/s1.11/tier1_overview.png`](docs/figures/s1.11/tier1_overview.png) | 8-panel grid (one per in-scope canonical run) showing GENVOC(t) trajectories from JAX (dashed, family-coloured) overlaid on Fortran (solid black). Panels labeled with the worst-case tier-1 relative L2 (always below 1%). Visual confirmation that JAX matches Fortran across the matrix at the precursor + first-gen level. |
+| [`docs/figures/s1.11/cascade_nonlinearity.png`](docs/figures/s1.11/cascade_nonlinearity.png) | Bar chart of the `high_voc / long_baseline` final-time ratio per species. Linear chemistry expects exactly 10×; JAX (green) hits 10× across the entire cascade; Fortran (black) drops to ~2.5× on deep-cascade species — REAL\*4 truncation in `DIFUN`'s `RKZ × C × C` products amplifies with cascade depth and absolute magnitude. Motivates why S1.11 restricts the regression to tier-1 (cascade comparison becomes meaningful again once `saprc14_rev1.f` is REAL\*8). |
 
 **S1.16 — Jacobian agreement**
 
